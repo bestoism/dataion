@@ -25,3 +25,18 @@ class DataContract(BaseModel):
                 ]
             }
         }
+        
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    # User langsung kirim list kolom saat bikin project
+    schema_definition: List[ColumnDefinition]
+
+class ProjectResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    schema_definition: List[ColumnDefinition]
+    
+    class Config:
+        orm_mode = True
