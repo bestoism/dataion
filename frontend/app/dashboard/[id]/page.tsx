@@ -292,7 +292,7 @@ export default function ProjectDetail({
 
             <button 
                 onClick={() => setIsDeleteModalOpen(true)}
-                className="flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded border border-red-200 dark:border-red-900/30 transition hover:shadow-sm"
+                className="cursor-pointer flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded border border-red-200 dark:border-red-900/30 transition hover:shadow-sm"
             >
                 <Trash2 size={14} /> Delete Project
             </button>
@@ -330,7 +330,7 @@ export default function ProjectDetail({
                 </h3>
                 
                 {!isEditing ? (
-                    <button onClick={() => setIsEditing(true)} className="text-zinc-500 hover:text-blue-500 transition" title="Edit Schema">
+                    <button onClick={() => setIsEditing(true)} className="text-zinc-500 cursor-pointer hover:text-blue-500 transition" title="Edit Schema">
                         <Pencil size={14} />
                     </button>
                 ) : (
@@ -570,7 +570,7 @@ export default function ProjectDetail({
                             <div className="flex justify-end">
                                 <Link href={`/dashboard/${projectId}/dataset/${ds.id}`}>
                                 <button className="
-                                    flex items-center gap-1.5 
+                                    flex items-center gap-1.5 cursor-pointer
                                     text-xs font-medium 
                                     text-blue-600 dark:text-blue-400
                                     border border-blue-200 dark:border-blue-900/30

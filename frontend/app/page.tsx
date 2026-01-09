@@ -35,9 +35,11 @@ export default function Home() {
             </button>
           </Link>
           
-          <a href="#" className="h-12 px-8 flex items-center justify-center rounded border border-zinc-300 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-400 dark:hover:border-zinc-600 transition-all duration-200 text-sm cursor-pointer">
-            Documentation
-          </a>
+          <Link href="/docs">
+            <button className="h-12 px-8 flex items-center justify-center rounded border border-zinc-300 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-400 dark:hover:border-zinc-600 transition-all duration-200 text-sm cursor-pointer">
+              Documentation
+            </button>
+          </Link>
         </div>
       </div>
       
