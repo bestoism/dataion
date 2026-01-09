@@ -145,6 +145,7 @@ npm run dev
 - [ ] Advanced Model Selection (XGBoost, LightGBM).
 - [ ] API Token Authentication (JWT).
 - [ ] Deployment via Docker.
-``` link GitHub User Attachments Anda yang sudah valid.
 
-Tinggal **Copy-Paste** semua kode di atas ke file `README.md` Anda, lalu Commit & Push. Hasilnya bakal cakep banget! 🚀
+---
+
+UNDER CONSTRUCTION
