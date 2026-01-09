@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation"; // Untuk redirect setelah delete
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import {
   ArrowLeft,
@@ -16,7 +16,8 @@ import {
   Trash2,
   Pencil,
   Save,
-  X
+  X,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 
@@ -63,7 +64,7 @@ export default function ProjectDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const router = useRouter(); // Init router
+  const router = useRouter();
   const [projectId, setProjectId] = useState<string>("");
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export default function ProjectDetail({
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // States untuk Fitur Utama
+  // States Fitur Utama
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<ValidationResult | null>(null);
@@ -81,9 +82,14 @@ export default function ProjectDetail({
   const [metrics, setMetrics] = useState<TrainingMetrics | null>(null);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
 
-  // State untuk Edit Schema
+  // States Edit Schema
   const [isEditing, setIsEditing] = useState(false);
   const [editedSchema, setEditedSchema] = useState<ColumnDef[]>([]);
+
+  // === STATES DELETE MODAL ===
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -93,7 +99,7 @@ export default function ProjectDetail({
       try {
         const response = await api.get(`/projects/${projectId}`);
         setProject(response.data);
-        setEditedSchema(response.data.schema_definition); // Init schema edit
+        setEditedSchema(response.data.schema_definition);
       } catch (error) {
         console.error("Failed to load project", error);
       } finally {
@@ -114,7 +120,7 @@ export default function ProjectDetail({
     fetchDatasets();
   }, [projectId, result]);
 
-  // --- HANDLERS UTAMA ---
+  // --- HANDLERS ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -166,20 +172,24 @@ export default function ProjectDetail({
     }
   };
 
-  // --- HANDLERS BARU: DELETE PROJECT ---
+  // --- HANDLER DELETE DENGAN VALIDASI NAMA ---
   const handleDeleteProject = async () => {
-    if (confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
-        try {
-            await api.delete(`/projects/${projectId}`);
-            router.push("/dashboard"); // Balik ke dashboard
-        } catch (error) {
-            console.error("Delete failed", error);
-            alert("Failed to delete project");
-        }
+    if (!project) return;
+    
+    // Cek apakah input sama dengan nama project
+    if (deleteInput !== project.name) return;
+
+    setIsDeleting(true);
+    try {
+        await api.delete(`/projects/${projectId}`);
+        router.push("/dashboard");
+    } catch (error) {
+        console.error("Delete failed", error);
+        alert("Failed to delete project");
+        setIsDeleting(false);
     }
   };
 
-  // --- HANDLERS BARU: EDIT SCHEMA ---
   const handleSchemaChange = (index: number, field: keyof ColumnDef, value: any) => {
     const newSchema = [...editedSchema];
     // @ts-ignore
@@ -190,8 +200,8 @@ export default function ProjectDetail({
   const saveSchema = async () => {
     try {
         const res = await api.put(`/projects/${projectId}/schema`, editedSchema);
-        setProject(res.data); // Update tampilan utama
-        setIsEditing(false); // Keluar mode edit
+        setProject(res.data);
+        setIsEditing(false);
         alert("Schema updated successfully!");
     } catch (error) {
         console.error("Update failed", error);
@@ -203,8 +213,59 @@ export default function ProjectDetail({
   if (!project) return <div className="p-12 text-zinc-500">Project not found.</div>;
 
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto bg-white dark:bg-[#09090b] transition-colors duration-300">
+    <div className="min-h-screen p-6 md:p-12 max-w-7xl mx-auto bg-white dark:bg-[#09090b] transition-colors duration-300 relative">
       
+      {/* === MODAL DELETE CONFIRMATION === */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl max-w-md w-full p-6">
+                <div className="flex items-center gap-3 text-red-600 dark:text-red-500 mb-4">
+                    <AlertTriangle size={24} />
+                    <h3 className="text-lg font-bold">Delete Project?</h3>
+                </div>
+                
+                <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-4">
+                    This action cannot be undone. This will permanently delete the 
+                    <span className="font-bold text-zinc-900 dark:text-white mx-1">{project.name}</span> 
+                    project and all associated datasets.
+                </p>
+
+                <div className="mb-6">
+                    <label className="block text-xs font-medium text-zinc-500 mb-2">
+                        To confirm, type <span className="select-all font-mono text-zinc-800 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1 rounded">{project.name}</span> in the box below
+                    </label>
+                    <input 
+                        type="text"
+                        value={deleteInput}
+                        onChange={(e) => setDeleteInput(e.target.value)}
+                        className="w-full p-2 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition"
+                        placeholder={project.name}
+                        autoFocus
+                    />
+                </div>
+
+                <div className="flex justify-end gap-3">
+                    <button 
+                        onClick={() => {
+                            setIsDeleteModalOpen(false);
+                            setDeleteInput(""); // Reset input saat close
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={handleDeleteProject}
+                        disabled={deleteInput !== project.name || isDeleting}
+                        className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {isDeleting ? "Deleting..." : "I understand, delete this project"}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-6">
         <div className="flex justify-between items-center mb-4">
@@ -215,9 +276,9 @@ export default function ProjectDetail({
             <ArrowLeft size={16} className="mr-2" /> Back to Projects
             </Link>
 
-            {/* TOMBOL DELETE PROJECT */}
+            {/* TOMBOL BUKA MODAL DELETE */}
             <button 
-                onClick={handleDeleteProject}
+                onClick={() => setIsDeleteModalOpen(true)}
                 className="flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded border border-red-200 dark:border-red-900/30 transition"
             >
                 <Trash2 size={14} /> Delete Project
@@ -246,7 +307,7 @@ export default function ProjectDetail({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* KOLOM KIRI: SCHEMA (DENGAN FITUR EDIT) */}
+        {/* KOLOM KIRI: SCHEMA */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
             
@@ -255,7 +316,6 @@ export default function ProjectDetail({
                 <Database size={16} className="text-zinc-400 dark:text-zinc-500" /> Data Contract
                 </h3>
                 
-                {/* Tombol Edit / Save Schema */}
                 {!isEditing ? (
                     <button onClick={() => setIsEditing(true)} className="text-zinc-500 hover:text-blue-500 transition">
                         <Pencil size={14} />
@@ -294,7 +354,6 @@ export default function ProjectDetail({
                       {col.name === project.target_column && " (Target)"}
                     </div>
                     
-                    {/* LOGIKA TAMPILAN: VIEW MODE vs EDIT MODE */}
                     {!isEditing ? (
                         <div className="text-xs text-zinc-500 dark:text-zinc-600 uppercase">
                         {col.dtype}
@@ -312,7 +371,6 @@ export default function ProjectDetail({
                     )}
                   </div>
 
-                  {/* LOGIKA REQUIRED CHECKBOX */}
                   {!isEditing ? (
                     col.required && (
                         <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500 px-2 py-0.5 rounded">
@@ -330,17 +388,15 @@ export default function ProjectDetail({
                 </div>
               ))}
             </div>
-            
             {isEditing && (
                 <p className="text-[10px] text-zinc-500 mt-4 text-center italic">
                     Change type or uncheck box to make column optional.
                 </p>
             )}
-
           </div>
         </div>
 
-        {/* KOLOM KANAN: WORKSPACE (TETAP SAMA) */}
+        {/* KOLOM KANAN: WORKSPACE */}
         <div className="lg:col-span-2 space-y-6">
           
           <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-8 text-center hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors">
