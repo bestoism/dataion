@@ -45,6 +45,13 @@ def create_new_project(project: ProjectCreate, db: Session = Depends(get_db)):
     """Membuat project baru dengan definisi schema"""
     return crud.create_project(db=db, project=project)
 
+@app.get("/projects/", response_model=List[ProjectResponse])
+def read_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Melihat daftar semua project"""
+    projects = crud.get_projects(db, skip=skip, limit=limit)
+    return projects
+
+
 @app.get("/projects/{project_id}", response_model=ProjectResponse)
 def read_project(project_id: int, db: Session = Depends(get_db)):
     """Melihat detail project dan schemanya"""
