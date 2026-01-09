@@ -9,6 +9,8 @@ from app.services import validator, crud
 import pandas as pd
 import io
 
+from app.services.ml_engine import train_automl
+
 # Init Database Tables
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -103,3 +105,55 @@ async def validate_data(
         "valid": result["valid"],
         "details": result
     }
+    
+@app.post("/models/train/{project_id}")
+async def train_model(
+    project_id: int, 
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    """
+    Upload CSV -> Validasi -> Jika Valid, Lanjut Training Model
+    """
+    # 1. Ambil Project Info
+    db_project = crud.get_project(db, project_id)
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # 2. Baca CSV
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
+    
+    try:
+        content = await file.read()
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read CSV: {str(e)}")
+
+    # 3. Validasi Data Dulu (Safety First!)
+    # Kita harus pastikan data sesuai kontrak sebelum masuk training
+    contract_obj = DataContract(
+        project_name=db_project.name,
+        version="v1",
+        columns=[ColumnDefinition(**col) for col in db_project.schema_definition]
+    )
+    
+    validation_result = validator.validate_dataframe(df, contract_obj)
+    
+    if not validation_result["valid"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Data validation failed. Cannot train model. Errors: {validation_result['errors']}"
+        )
+
+    # 4. Jalankan AutoML
+    try:
+        training_result = train_automl(df, target_col=db_project.target_column)
+        return {
+            "status": "success",
+            "project": db_project.name,
+            "target": db_project.target_column,
+            "metrics": training_result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")

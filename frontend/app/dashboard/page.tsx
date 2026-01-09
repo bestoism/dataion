@@ -44,9 +44,11 @@ export default function Dashboard() {
           </p>
         </div>
         
-        <button className="flex items-center gap-2 bg-zinc-100 hover:bg-white text-black px-4 py-2 rounded text-sm font-medium transition cursor-pointer">
-          <Plus size={16} /> New Project
-        </button>
+        <Link href="/dashboard/new">
+          <button className="flex items-center gap-2 bg-zinc-100 hover:bg-white text-black px-4 py-2 rounded text-sm font-medium transition cursor-pointer">
+            <Plus size={16} /> New Project
+          </button>
+        </Link>
       </div>
 
       {/* Content */}
@@ -62,33 +64,34 @@ export default function Dashboard() {
         // Grid Card yang "Clean Industrial"
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {projects.map((proj) => (
-            <div 
-              key={proj.id} 
-              className="group relative p-6 bg-zinc-900/40 border border-zinc-800 rounded-lg hover:border-zinc-600 hover:bg-zinc-900/80 transition-all duration-200 cursor-pointer flex flex-col justify-between h-48"
-            >
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-zinc-900 rounded border border-zinc-800 text-zinc-400">
-                    <Folder size={18} />
+            <Link href={`/dashboard/${proj.id}`} key={proj.id}>
+              <div 
+                className="group relative p-6 bg-zinc-900/40 border border-zinc-800 rounded-lg hover:border-zinc-600 hover:bg-zinc-900/80 transition-all duration-200 cursor-pointer flex flex-col justify-between h-48"
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-zinc-900 rounded border border-zinc-800 text-zinc-400">
+                      <Folder size={18} />
+                    </div>
+                    <span className="text-[10px] font-medium text-zinc-600 border border-zinc-800 px-2 py-1 rounded-full">
+                      ID-{proj.id}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-medium text-zinc-600 border border-zinc-800 px-2 py-1 rounded-full">
-                    ID-{proj.id}
-                  </span>
+                  
+                  <h3 className="text-base font-medium text-zinc-200 group-hover:text-white mb-2">
+                    {proj.name}
+                  </h3>
+                  <p className="text-sm text-zinc-500 line-clamp-2 leading-relaxed">
+                    {proj.description || "No description provided."}
+                  </p>
                 </div>
-                
-                <h3 className="text-base font-medium text-zinc-200 group-hover:text-white mb-2">
-                  {proj.name}
-                </h3>
-                <p className="text-sm text-zinc-500 line-clamp-2 leading-relaxed">
-                  {proj.description || "No description provided."}
-                </p>
-              </div>
 
-              {/* Link icon di pojok bawah */}
-              <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <ArrowUpRight size={18} className="text-zinc-400" />
+                {/* Link icon di pojok bawah */}
+                <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <ArrowUpRight size={18} className="text-zinc-400" />
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

@@ -3,12 +3,12 @@ from app.db import models
 from app.schemas.contract import ProjectCreate
 
 def create_project(db: Session, project: ProjectCreate):
-    # Convert list of pydantic models to list of dicts for JSON storage
     schema_json = [col.dict() for col in project.schema_definition]
     
     db_project = models.Project(
         name=project.name,
         description=project.description,
+        target_column=project.target_column,
         schema_definition=schema_json
     )
     db.add(db_project)

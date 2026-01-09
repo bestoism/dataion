@@ -40,3 +40,19 @@ class ProjectResponse(BaseModel):
     
     class Config:
         orm_mode = True
+        
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    target_column: str  # <--- TAMBAHAN BARU
+    schema_definition: List[ColumnDefinition]
+
+class ProjectResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    target_column: str  # <--- TAMBAHAN BARU
+    schema_definition: List[ColumnDefinition]
+    
+    class Config:
+        orm_mode = True
