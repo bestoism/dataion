@@ -1,24 +1,33 @@
 import Link from "next/link";
-import { ThemeToggle } from "@/components/theme-toggle"; // <--- Import tombol
+import { ThemeToggle } from "@/components/theme-toggle"; 
+import { BackgroundParticles } from "@/components/background-particles"; // <--- 1. Import ini
 
 export default function Home() {
   return (
-    <main className="flex h-screen w-full flex-col items-center justify-center px-4 relative bg-white dark:bg-[#09090b] transition-colors duration-300">
+    <main className="flex h-screen w-full flex-col items-center justify-center px-4 relative bg-white dark:bg-[#09090b] transition-colors duration-300 overflow-hidden">
+      
+      {/* 2. Masukkan Component Background di sini (Paling Bawah Secara Layer) */}
+      <BackgroundParticles />
+
+      {/* ... SISA KODE LAMA TETAP SAMA ... */}
       
       {/* Tombol Toggle di pojok kanan atas */}
-      <div className="absolute top-6 right-6">
+      <div className="absolute top-6 right-6 z-50"> {/* Tambah z-50 biar bisa diklik */}
         <ThemeToggle />
       </div>
 
+      {/* Grid Pattern Lama (Opsional, boleh dihapus atau digabung) */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.05)_0%,transparent_100%)] dark:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_100%)] pointer-events-none" />
 
       <div className="z-10 text-center max-w-2xl space-y-8">
         
-        <div className="inline-flex items-center px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 text-xs text-zinc-600 dark:text-zinc-400 font-medium tracking-wide">
+        {/* ... KONTEN LAIN BIARKAN SAMA ... */}
+        
+        <div className="inline-flex items-center px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 text-xs text-zinc-600 dark:text-zinc-400 font-medium tracking-wide backdrop-blur-sm">
           v1.0.0 • Public Beta
         </div>
 
-        <h1 className="text-6xl md:text-7xl font-bold tracking-tight text-zinc-900 dark:text-white">
+        <h1 className="text-6xl md:text-7xl font-bold tracking-tight text-zinc-900 dark:text-white drop-shadow-sm">
           DATAION.
         </h1>
         
@@ -30,13 +39,13 @@ export default function Home() {
         
         <div className="pt-4 flex flex-col md:flex-row gap-4 justify-center items-center">
           <Link href="/dashboard">
-            <button className="h-12 px-8 rounded bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-all duration-200 text-sm tracking-wide cursor-pointer">
+            <button className="h-12 px-8 rounded bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-all duration-200 text-sm tracking-wide cursor-pointer shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform">
               Open Console
             </button>
           </Link>
           
           <Link href="/docs">
-            <button className="h-12 px-8 flex items-center justify-center rounded border border-zinc-300 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-400 dark:hover:border-zinc-600 transition-all duration-200 text-sm cursor-pointer">
+            <button className="h-12 px-8 flex items-center justify-center rounded border border-zinc-300 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-400 dark:hover:border-zinc-600 transition-all duration-200 text-sm cursor-pointer backdrop-blur-sm bg-white/50 dark:bg-black/20">
               Documentation
             </button>
           </Link>
