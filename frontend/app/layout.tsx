@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-// 1. Import font JetBrains Mono
-import { JetBrains_Mono } from "next/font/google"; 
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider"; // <--- Import ini
 
-// 2. Konfigurasi font
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "700"], // Kita ambil yang biasa dan bold
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -21,10 +20,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      {/* 3. Terapkan font ke body */}
-      <body className={`${jetbrainsMono.variable} font-mono antialiased bg-black text-green-400`}>
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      {/* PERHATIKAN BAGIAN CLASSNAME INI */}
+      <body className={`${jetbrainsMono.variable} font-mono antialiased 
+        min-h-screen
+        bg-white text-zinc-900 
+        dark:bg-[#09090b] dark:text-zinc-100 
+        transition-colors duration-300`} // Efek transisi halus
+      >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
