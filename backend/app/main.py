@@ -5,6 +5,10 @@ from app.services.validator import validate_dataframe
 import pandas as pd
 import io
 
+from app.db import models
+from app.db.database import engine
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="DATAION API",
     description="Backend service for DATAION Data Platform",
