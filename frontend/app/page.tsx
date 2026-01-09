@@ -1,17 +1,47 @@
-import Link from "next/link"; // <--- Jangan lupa import ini di paling atas
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="flex h-screen w-full flex-col items-center justify-center bg-gray-900 text-white overflow-hidden">
-      <h1 className="text-5xl font-bold mb-4 tracking-tight">DATAION</h1>
-      <p className="text-xl text-gray-400 mb-8">End-to-End Data Platform</p>
+    <main className="flex h-screen w-full flex-col items-center justify-center px-4 relative">
       
-      {/* Ubah button menjadi Link */}
-      <Link href="/dashboard">
-        <button className="px-8 py-3 bg-blue-600 rounded-lg font-medium hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/20 cursor-pointer">
-          Get Started
-        </button>
-      </Link>
+      {/* Background radial halus sekali, supaya tidak flat mati */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_100%)] pointer-events-none" />
+
+      <div className="z-10 text-center max-w-2xl space-y-8">
+        
+        {/* Badge kecil yang kalem */}
+        <div className="inline-flex items-center px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900/50 text-xs text-zinc-400 font-medium tracking-wide">
+          v1.0.0 • Public Beta
+        </div>
+
+        {/* Judul Besar tapi Tipis/Elegan */}
+        <h1 className="text-6xl md:text-7xl font-bold tracking-tight text-white">
+          DATAION.
+        </h1>
+        
+        <p className="text-lg text-zinc-400 leading-relaxed font-light">
+          The strict data contract platform for engineering teams.
+          <br />
+          Validate schema, enforce quality, deploy with confidence.
+        </p>
+        
+        <div className="pt-4 flex flex-col md:flex-row gap-4 justify-center items-center">
+          <Link href="/dashboard">
+            <button className="h-12 px-8 rounded bg-white text-black font-semibold hover:bg-zinc-200 transition-all duration-200 text-sm tracking-wide cursor-pointer">
+              Open Console
+            </button>
+          </Link>
+          
+          <a href="#" className="h-12 px-8 flex items-center justify-center rounded border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all duration-200 text-sm cursor-pointer">
+            Documentation
+          </a>
+        </div>
+      </div>
+      
+      {/* Footer minimalis */}
+      <div className="absolute bottom-8 text-[10px] text-zinc-600 uppercase tracking-widest">
+        Engineered for Reliability
+      </div>
     </main>
   );
 }
