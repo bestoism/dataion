@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse 
 from sqlalchemy.orm import Session
-from typing import List # <--- WAJIB ADA
+from typing import List  # <--- WAJIB ADA
 
 # Import Schema & Models
 from app.db import models, database
-from app.schemas.contract import ProjectCreate, ProjectResponse, DataContract, ColumnDefinition # <--- ColumnDefinition WAJIB ADA
+from app.schemas.contract import ProjectCreate, ProjectResponse, DataContract, ColumnDefinition
 from app.services import validator, crud, ml_engine
 
 import pandas as pd
@@ -15,6 +16,7 @@ import shutil
 import uuid
 
 import numpy as np
+from fastapi.responses import FileResponse 
 
 # Init Database
 models.Base.metadata.create_all(bind=database.engine)
@@ -25,12 +27,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Setup CORS (Agar Frontend bisa akses PUT/DELETE)
+# Setup CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"], # Pastikan ini bintang (*) agar PUT dan DELETE diizinkan
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -68,14 +70,11 @@ def read_project(project_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Project not found")
     return db_project
 
-# === ENDPOINT BARU (UPDATE & DELETE) ===
+# === UPDATE & DELETE PROJECT ===
 
 @app.put("/projects/{project_id}/schema", response_model=ProjectResponse)
 def update_schema(project_id: int, new_schema: List[ColumnDefinition], db: Session = Depends(get_db)):
-    """Mengupdate definisi schema project"""
-    # Convert Pydantic list ke list of dicts agar bisa disimpan di JSON DB
     schema_json = [col.dict() for col in new_schema]
-    
     updated_project = crud.update_project_schema(db, project_id, schema_json)
     if not updated_project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -83,7 +82,6 @@ def update_schema(project_id: int, new_schema: List[ColumnDefinition], db: Sessi
 
 @app.delete("/projects/{project_id}")
 def delete_existing_project(project_id: int, db: Session = Depends(get_db)):
-    """Menghapus project dan dataset history-nya"""
     success = crud.delete_project(db, project_id)
     if not success:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -93,40 +91,43 @@ def delete_existing_project(project_id: int, db: Session = Depends(get_db)):
 
 @app.get("/projects/{project_id}/datasets")
 def get_project_datasets(project_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Dataset).filter(models.Dataset.project_id == project_id).order_by(models.Dataset.upload_date.desc()).all()
+    return (
+        db.query(models.Dataset)
+        .filter(models.Dataset.project_id == project_id)
+        .order_by(models.Dataset.upload_date.desc())
+        .all()
+    )
 
-# --- VALIDATION & TRAINING ---
+# --- VALIDATION ---
 
 @app.post("/data/validate/{project_id}")
 async def validate_data(project_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    # 1. Cek Project
     db_project = crud.get_project(db, project_id)
     if not db_project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    # 2. Simpan File
+
     unique_filename = f"{uuid.uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
+
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
 
-    # 3. Validasi
     try:
         df = pd.read_csv(file_path)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read CSV: {str(e)}")
-    
+
     contract_obj = DataContract(
         project_name=db_project.name,
         version="v1",
         columns=[ColumnDefinition(**col) for col in db_project.schema_definition]
     )
+
     result = validator.validate_dataframe(df, contract_obj)
 
-    # 4. Catat History
     new_dataset = models.Dataset(
         project_id=project_id,
         filename=file.filename,
@@ -136,7 +137,7 @@ async def validate_data(project_id: int, file: UploadFile = File(...), db: Sessi
     )
     db.add(new_dataset)
     db.commit()
-    
+
     return {
         "project": db_project.name,
         "filename": file.filename,
@@ -145,87 +146,87 @@ async def validate_data(project_id: int, file: UploadFile = File(...), db: Sessi
         "dataset_id": new_dataset.id
     }
 
+# --- TRAIN MODEL (UPDATED SESUAI PERMINTAAN) ---
+
 @app.post("/models/train/{project_id}")
 async def train_model(project_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
     db_project = crud.get_project(db, project_id)
     if not db_project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
-    
+
     try:
         content = await file.read()
         df = pd.read_csv(io.BytesIO(content))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read CSV: {str(e)}")
 
-    # Validasi dulu sebelum training
     contract_obj = DataContract(
         project_name=db_project.name,
         version="v1",
         columns=[ColumnDefinition(**col) for col in db_project.schema_definition]
     )
-    validation_result = validator.validate_dataframe(df, contract_obj)
-    
-    if not validation_result["valid"]:
-        raise HTTPException(status_code=400, detail=f"Data validation failed. Cannot train model.")
 
-    # AutoML
+    validation_result = validator.validate_dataframe(df, contract_obj)
+    if not validation_result["valid"]:
+        raise HTTPException(status_code=400, detail="Data validation failed. Cannot train model.")
+
     try:
-        training_result = ml_engine.train_automl(df, target_col=db_project.target_column)
+        # Gunakan nama unik: model_projectID
+        prefix = f"model_project_{project_id}"
+        training_result = ml_engine.train_automl(
+            df,
+            target_col=db_project.target_column,
+            filename_prefix=prefix
+        )
+
         return {
             "status": "success",
             "project": db_project.name,
-            "target": db_project.target_column,
             "metrics": training_result
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
-    
+
+# --- DATASET STATS (EDA) ---
+
 @app.get("/datasets/{dataset_id}/stats")
 def get_dataset_stats(dataset_id: int, db: Session = Depends(get_db)):
-    # 1. Ambil info dataset
     dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
-    # 2. Baca File
+
     try:
         df = pd.read_csv(dataset.file_path)
     except Exception:
         raise HTTPException(status_code=500, detail="File not found on server")
 
-    # 3. Hitung Statistik EDA
     stats = []
     total_rows = len(df)
-    
+
     for col in df.columns:
         col_type = str(df[col].dtype)
         missing_count = int(df[col].isnull().sum())
         missing_pct = round((missing_count / total_rows) * 100, 1)
         unique_count = int(df[col].nunique())
-        
+
         col_stat = {
             "name": col,
             "type": col_type,
             "missing": missing_count,
             "missing_pct": missing_pct,
             "unique": unique_count,
-            "sample": df[col].dropna().head(3).tolist() # Ambil 3 sampel data
+            "sample": df[col].dropna().head(3).tolist()
         }
 
-        # Statistik khusus Numerik
         if pd.api.types.is_numeric_dtype(df[col]):
             col_stat["mean"] = round(float(df[col].mean()), 2)
             col_stat["min"] = float(df[col].min())
             col_stat["max"] = float(df[col].max())
-        
-        # Statistik khusus Kategori (Top Values)
         else:
-            # Ambil top 3 kategori terbanyak
-            top_counts = df[col].value_counts().head(3).to_dict()
-            col_stat["distribution"] = top_counts
+            col_stat["distribution"] = df[col].value_counts().head(3).to_dict()
 
         stats.append(col_stat)
 
@@ -236,25 +237,28 @@ def get_dataset_stats(dataset_id: int, db: Session = Depends(get_db)):
         "columns": stats
     }
 
+# --- TRAIN FROM HISTORY ---
+
 @app.post("/models/train-existing/{dataset_id}")
 def train_model_from_history(dataset_id: int, db: Session = Depends(get_db)):
-    # 1. Ambil dataset
     dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
-    # 2. Ambil Project info (untuk tahu Target Column)
+
     project = crud.get_project(db, dataset.project_id)
-    
-    # 3. Baca File
+
     try:
         df = pd.read_csv(dataset.file_path)
     except Exception:
         raise HTTPException(status_code=500, detail="File lost from server")
 
-    # 4. Jalankan AutoML
     try:
-        training_result = ml_engine.train_automl(df, target_col=project.target_column)
+        prefix = f"model_project_{project.id}"
+        training_result = ml_engine.train_automl(
+            df,
+            target_col=project.target_column,
+            filename_prefix=prefix
+        )
         return {
             "status": "success",
             "project": project.name,
@@ -262,3 +266,14 @@ def train_model_from_history(dataset_id: int, db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+
+
+@app.get("/models/download/{filename}")
+def download_model(filename: str):
+    # Pastikan path sesuai dengan tempat ml_engine menyimpan file
+    file_path = os.path.join("models", filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Model file not found on server")
+    
+    return FileResponse(file_path, media_type='application/octet-stream', filename=filename)

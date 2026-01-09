@@ -18,7 +18,8 @@ import {
   Save,
   X,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Download
 } from "lucide-react";
 import Link from "next/link";
 
@@ -50,6 +51,7 @@ interface TrainingMetrics {
   accuracy: number;
   dataset_rows: number;
   features_used: string[];
+  artifact_path?: string;
 }
 
 interface Dataset {
@@ -205,6 +207,12 @@ export default function ProjectDetail({
         console.error("Update failed", error);
         alert("Failed to update schema");
     }
+  };
+
+  const handleDownloadModel = (filename: string) => {
+    // Karena download file, kita bisa pakai window.open atau link biasa
+    // Tapi biar rapi pakai URL backend langsung
+    window.open(`http://127.0.0.1:8000/models/download/${filename}`, "_blank");
   };
 
   // Loading State yang lebih rapi (Center)
@@ -470,13 +478,24 @@ export default function ProjectDetail({
           {/* TRAINING METRICS */}
           {metrics && (
               <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400"><BarChart3 size={24} /></div>
-                      <div>
-                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Model Performance</h3>
-                          <p className="text-sm text-zinc-500">AutoML Training Results</p>
+                  <div className="flex justify-between items-start mb-6">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400"><BarChart3 size={24} /></div>
+                          <div>
+                              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">Model Performance</h3>
+                              <p className="text-sm text-zinc-500">AutoML Training Results</p>
+                          </div>
                       </div>
-                  </div>
+                      
+                      {metrics.artifact_path && (
+                          <button 
+                              onClick={() => handleDownloadModel(metrics.artifact_path!)}
+                              className="flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black text-xs font-bold uppercase tracking-wider rounded shadow-lg hover:opacity-90 transition"
+                          >
+                              <Download size={16} /> Download .joblib
+                          </button>
+                      )}
+                  </div>                  
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                       <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-lg">

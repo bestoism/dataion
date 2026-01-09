@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { 
   ArrowLeft, BarChart3, Binary, FileText, Hash, 
-  Table, Cpu, AlertCircle, Activity
+  Table, Cpu, AlertCircle, Activity, CheckCircle, Download // <--- Tambah Import Download
 } from "lucide-react";
 import Link from "next/link";
 
@@ -34,6 +34,7 @@ interface TrainingMetrics {
   accuracy: number;
   dataset_rows: number;
   features_used: string[];
+  artifact_path?: string; // <--- Tambah field ini
 }
 
 export default function DatasetExplorer({
@@ -80,7 +81,9 @@ export default function DatasetExplorer({
       const res = await api.post(`/models/train-existing/${ids.datasetId}`);
       setMetrics(res.data.metrics);
       // Scroll ke bawah otomatis
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 100);
     } catch (error) {
       alert("Training failed. Check console.");
       console.error(error);
@@ -89,7 +92,19 @@ export default function DatasetExplorer({
     }
   };
 
-  if (!ids || loading) return <div className="p-12 text-zinc-500">Analyzing dataset structure...</div>;
+  // Fungsi Download Model
+  const handleDownloadModel = (filename: string) => {
+    window.open(`http://127.0.0.1:8000/models/download/${filename}`, "_blank");
+  };
+
+  if (!ids || loading) return (
+    <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#09090b]">
+        <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
+            <Activity size={20} /> Analyzing dataset structure...
+        </div>
+    </div>
+  );
+  
   if (!stats) return <div className="p-12 text-red-500">Failed to load dataset statistics.</div>;
 
   return (
@@ -110,11 +125,11 @@ export default function DatasetExplorer({
             <p className="text-zinc-500 mt-2">Exploratory Data Analysis (EDA) & Modeling</p>
         </div>
 
-        {/* TOMBOL TRAIN DI ATAS JUGA */}
+        {/* TOMBOL TRAIN DI ATAS */}
         <button 
             onClick={handleTrain}
             disabled={training}
-            className="bg-zinc-900 dark:bg-white text-white dark:text-black px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90 transition disabled:opacity-50"
+            className="bg-zinc-900 dark:bg-white text-white dark:text-black px-6 py-3 rounded-lg font-semibold flex items-center gap-2 hover:opacity-90 transition disabled:opacity-50 cursor-pointer shadow-lg"
         >
             {training ? <Activity className="animate-spin" /> : <Cpu />}
             {training ? "Training Model..." : "Train Model on this Data"}
@@ -172,15 +187,15 @@ export default function DatasetExplorer({
                         <div className="grid grid-cols-3 gap-2 text-center bg-zinc-50 dark:bg-zinc-900/50 p-2 rounded">
                             <div>
                                 <div className="text-[10px] text-zinc-500 uppercase">Min</div>
-                                <div className="font-mono">{col.min}</div>
+                                <div className="font-mono text-zinc-700 dark:text-zinc-300">{col.min}</div>
                             </div>
                             <div>
                                 <div className="text-[10px] text-zinc-500 uppercase">Mean</div>
-                                <div className="font-mono font-bold">{col.mean}</div>
+                                <div className="font-mono font-bold text-zinc-900 dark:text-white">{col.mean}</div>
                             </div>
                             <div>
                                 <div className="text-[10px] text-zinc-500 uppercase">Max</div>
-                                <div className="font-mono">{col.max}</div>
+                                <div className="font-mono text-zinc-700 dark:text-zinc-300">{col.max}</div>
                             </div>
                         </div>
                     )}
@@ -191,7 +206,7 @@ export default function DatasetExplorer({
                             <div className="text-[10px] text-zinc-500 uppercase mb-1">Top Categories</div>
                             {Object.entries(col.distribution).map(([key, val]) => (
                                 <div key={key} className="flex justify-between items-center text-xs">
-                                    <span className="truncate w-32">{key}</span>
+                                    <span className="truncate w-32 text-zinc-700 dark:text-zinc-300">{key}</span>
                                     <div className="flex-1 mx-2 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                         <div 
                                             className="h-full bg-blue-500" 
@@ -220,17 +235,29 @@ export default function DatasetExplorer({
         ))}
       </div>
 
-      {/* HASIL TRAINING */}
+      {/* HASIL TRAINING (DENGAN TOMBOL DOWNLOAD) */}
       {metrics && (
           <div className="mt-12 bg-zinc-900 dark:bg-zinc-800 text-white rounded-xl p-8 animate-in slide-in-from-bottom-10 fade-in duration-700 shadow-2xl">
-              <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50">
-                      <BarChart3 size={32} className="text-white" />
+              <div className="flex justify-between items-start mb-8">
+                  <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50">
+                          <BarChart3 size={32} className="text-white" />
+                      </div>
+                      <div>
+                          <h2 className="text-2xl font-bold">Model Trained Successfully!</h2>
+                          <p className="text-zinc-400">Result from {stats.filename}</p>
+                      </div>
                   </div>
-                  <div>
-                      <h2 className="text-2xl font-bold">Model Trained Successfully!</h2>
-                      <p className="text-zinc-400">Result from {stats.filename}</p>
-                  </div>
+
+                  {/* TOMBOL DOWNLOAD */}
+                  {metrics.artifact_path && (
+                    <button 
+                        onClick={() => handleDownloadModel(metrics.artifact_path!)}
+                        className="flex items-center gap-2 px-5 py-3 bg-white text-zinc-900 font-bold text-sm uppercase tracking-wide rounded hover:bg-zinc-200 transition shadow-lg cursor-pointer"
+                    >
+                        <Download size={18} /> Download Model
+                    </button>
+                  )}
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -240,7 +267,7 @@ export default function DatasetExplorer({
                   </div>
                   <div className="bg-white/5 p-4 rounded-lg border border-white/10">
                       <div className="text-xs text-zinc-400 uppercase mb-1">Algorithm</div>
-                      <div className="text-xl font-bold truncate">{metrics.model_type}</div>
+                      <div className="text-xl font-bold truncate" title={metrics.model_type}>{metrics.model_type}</div>
                   </div>
                   <div className="bg-white/5 p-4 rounded-lg border border-white/10">
                       <div className="text-xs text-zinc-400 uppercase mb-1">Rows Used</div>
@@ -256,8 +283,4 @@ export default function DatasetExplorer({
 
     </div>
   );
-}
-
-function CheckCircle({ size }: { size: number }) {
-    return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
 }
