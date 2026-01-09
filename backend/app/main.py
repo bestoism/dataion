@@ -14,6 +14,8 @@ import os
 import shutil
 import uuid
 
+import numpy as np
+
 # Init Database
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -176,6 +178,86 @@ async def train_model(project_id: int, file: UploadFile = File(...), db: Session
             "status": "success",
             "project": db_project.name,
             "target": db_project.target_column,
+            "metrics": training_result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+    
+@app.get("/datasets/{dataset_id}/stats")
+def get_dataset_stats(dataset_id: int, db: Session = Depends(get_db)):
+    # 1. Ambil info dataset
+    dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # 2. Baca File
+    try:
+        df = pd.read_csv(dataset.file_path)
+    except Exception:
+        raise HTTPException(status_code=500, detail="File not found on server")
+
+    # 3. Hitung Statistik EDA
+    stats = []
+    total_rows = len(df)
+    
+    for col in df.columns:
+        col_type = str(df[col].dtype)
+        missing_count = int(df[col].isnull().sum())
+        missing_pct = round((missing_count / total_rows) * 100, 1)
+        unique_count = int(df[col].nunique())
+        
+        col_stat = {
+            "name": col,
+            "type": col_type,
+            "missing": missing_count,
+            "missing_pct": missing_pct,
+            "unique": unique_count,
+            "sample": df[col].dropna().head(3).tolist() # Ambil 3 sampel data
+        }
+
+        # Statistik khusus Numerik
+        if pd.api.types.is_numeric_dtype(df[col]):
+            col_stat["mean"] = round(float(df[col].mean()), 2)
+            col_stat["min"] = float(df[col].min())
+            col_stat["max"] = float(df[col].max())
+        
+        # Statistik khusus Kategori (Top Values)
+        else:
+            # Ambil top 3 kategori terbanyak
+            top_counts = df[col].value_counts().head(3).to_dict()
+            col_stat["distribution"] = top_counts
+
+        stats.append(col_stat)
+
+    return {
+        "filename": dataset.filename,
+        "total_rows": total_rows,
+        "total_cols": len(df.columns),
+        "columns": stats
+    }
+
+@app.post("/models/train-existing/{dataset_id}")
+def train_model_from_history(dataset_id: int, db: Session = Depends(get_db)):
+    # 1. Ambil dataset
+    dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # 2. Ambil Project info (untuk tahu Target Column)
+    project = crud.get_project(db, dataset.project_id)
+    
+    # 3. Baca File
+    try:
+        df = pd.read_csv(dataset.file_path)
+    except Exception:
+        raise HTTPException(status_code=500, detail="File lost from server")
+
+    # 4. Jalankan AutoML
+    try:
+        training_result = ml_engine.train_automl(df, target_col=project.target_column)
+        return {
+            "status": "success",
+            "project": project.name,
             "metrics": training_result
         }
     except Exception as e:

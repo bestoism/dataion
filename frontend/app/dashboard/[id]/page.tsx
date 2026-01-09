@@ -17,7 +17,8 @@ import {
   Pencil,
   Save,
   X,
-  AlertTriangle
+  AlertTriangle,
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 
@@ -86,7 +87,7 @@ export default function ProjectDetail({
   const [isEditing, setIsEditing] = useState(false);
   const [editedSchema, setEditedSchema] = useState<ColumnDef[]>([]);
 
-  // === STATES DELETE MODAL ===
+  // States Delete Modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -172,11 +173,8 @@ export default function ProjectDetail({
     }
   };
 
-  // --- HANDLER DELETE DENGAN VALIDASI NAMA ---
   const handleDeleteProject = async () => {
     if (!project) return;
-    
-    // Cek apakah input sama dengan nama project
     if (deleteInput !== project.name) return;
 
     setIsDeleting(true);
@@ -209,7 +207,15 @@ export default function ProjectDetail({
     }
   };
 
-  if (loading) return <div className="p-12 text-zinc-500">Loading modules...</div>;
+  // Loading State yang lebih rapi (Center)
+  if (loading) return (
+    <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#09090b]">
+        <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
+            <Activity size={20} /> Loading modules...
+        </div>
+    </div>
+  );
+  
   if (!project) return <div className="p-12 text-zinc-500">Project not found.</div>;
 
   return (
@@ -248,7 +254,7 @@ export default function ProjectDetail({
                     <button 
                         onClick={() => {
                             setIsDeleteModalOpen(false);
-                            setDeleteInput(""); // Reset input saat close
+                            setDeleteInput("");
                         }}
                         className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition"
                     >
@@ -259,7 +265,7 @@ export default function ProjectDetail({
                         disabled={deleteInput !== project.name || isDeleting}
                         className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                        {isDeleting ? "Deleting..." : "I understand, delete this project"}
+                        {isDeleting ? "Deleting..." : "Delete Project"}
                     </button>
                 </div>
             </div>
@@ -276,10 +282,9 @@ export default function ProjectDetail({
             <ArrowLeft size={16} className="mr-2" /> Back to Projects
             </Link>
 
-            {/* TOMBOL BUKA MODAL DELETE */}
             <button 
                 onClick={() => setIsDeleteModalOpen(true)}
-                className="flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded border border-red-200 dark:border-red-900/30 transition"
+                className="flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 dark:bg-red-900/10 px-3 py-2 rounded border border-red-200 dark:border-red-900/30 transition hover:shadow-sm"
             >
                 <Trash2 size={14} /> Delete Project
             </button>
@@ -317,15 +322,15 @@ export default function ProjectDetail({
                 </h3>
                 
                 {!isEditing ? (
-                    <button onClick={() => setIsEditing(true)} className="text-zinc-500 hover:text-blue-500 transition">
+                    <button onClick={() => setIsEditing(true)} className="text-zinc-500 hover:text-blue-500 transition" title="Edit Schema">
                         <Pencil size={14} />
                     </button>
                 ) : (
                     <div className="flex gap-2">
-                        <button onClick={() => setIsEditing(false)} className="text-zinc-500 hover:text-red-500 transition">
+                        <button onClick={() => setIsEditing(false)} className="text-zinc-500 hover:text-red-500 transition" title="Cancel">
                             <X size={14} />
                         </button>
-                        <button onClick={saveSchema} className="text-green-600 hover:text-green-500 transition">
+                        <button onClick={saveSchema} className="text-green-600 hover:text-green-500 transition" title="Save">
                             <Save size={14} />
                         </button>
                     </div>
@@ -362,7 +367,7 @@ export default function ProjectDetail({
                         <select 
                             value={col.dtype}
                             onChange={(e) => handleSchemaChange(idx, "dtype", e.target.value)}
-                            className="mt-1 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-1 py-0.5 w-full outline-none"
+                            className="mt-1 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-1 py-0.5 w-full outline-none text-zinc-900 dark:text-white"
                         >
                             <option value="object">String</option>
                             <option value="int">Integer</option>
@@ -390,7 +395,7 @@ export default function ProjectDetail({
             </div>
             {isEditing && (
                 <p className="text-[10px] text-zinc-500 mt-4 text-center italic">
-                    Change type or uncheck box to make column optional.
+                    Uncheck box to make column optional.
                 </p>
             )}
           </div>
@@ -399,6 +404,7 @@ export default function ProjectDetail({
         {/* KOLOM KANAN: WORKSPACE */}
         <div className="lg:col-span-2 space-y-6">
           
+          {/* UPLOAD AREA */}
           <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-8 text-center hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors">
             <input type="file" id="csvUpload" accept=".csv" onChange={handleFileChange} className="hidden" />
             
@@ -424,6 +430,7 @@ export default function ProjectDetail({
             )}
           </div>
 
+          {/* VALIDATION RESULT */}
           {result && (
             <div className={`border rounded-lg p-6 ${result.valid ? 'bg-green-50 dark:bg-green-950/10 border-green-200 dark:border-green-900/30' : 'bg-red-50 dark:bg-red-950/10 border-red-200 dark:border-red-900/30'}`}>
               <div className="flex items-start gap-4">
@@ -460,6 +467,7 @@ export default function ProjectDetail({
             </div>
           )}
 
+          {/* TRAINING METRICS */}
           {metrics && (
               <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <div className="flex items-center gap-3 mb-6">
@@ -491,6 +499,7 @@ export default function ProjectDetail({
               </div>
           )}
 
+          {/* DATASET HISTORY */}
           <div className="mt-8 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
             <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider mb-4">
               Dataset History
@@ -509,13 +518,14 @@ export default function ProjectDetail({
                       <th className="px-4 py-3">Rows</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {datasets.map((ds) => (
                       <tr
                         key={ds.id}
-                        className="border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/30"
+                        className="border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/30 transition group"
                       >
                         <td className="px-4 py-3 font-mono text-zinc-700 dark:text-zinc-300">
                           {ds.filename}
@@ -534,6 +544,25 @@ export default function ProjectDetail({
                         </td>
                         <td className="px-4 py-3 text-zinc-500">
                           {new Date(ds.upload_date).toLocaleDateString()}
+                        </td>
+                        
+                        {/* BUTTON EXPLORE */}
+                        <td className="px-4 py-3">
+                            <div className="flex justify-end">
+                                <Link href={`/dashboard/${projectId}/dataset/${ds.id}`}>
+                                <button className="
+                                    flex items-center gap-1.5 
+                                    text-xs font-medium 
+                                    text-blue-600 dark:text-blue-400
+                                    border border-blue-200 dark:border-blue-900/30
+                                    px-3 py-1.5 rounded-md
+                                    hover:bg-blue-600 hover:text-white dark:hover:bg-blue-500
+                                    transition-all duration-200
+                                ">
+                                    Explore <ExternalLink size={12} />
+                                </button>
+                                </Link>
+                            </div>
                         </td>
                       </tr>
                     ))}
