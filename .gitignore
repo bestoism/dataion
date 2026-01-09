@@ -1,0 +1,20 @@
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.DS_Store
+
+# --- Node / Frontend ---
+node_modules/
+.next/
+out/
+build/
+dist/
+.npm
+*.log
+
+# --- IDE ---
+.vscode/
+.idea/
