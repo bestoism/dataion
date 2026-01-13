@@ -19,7 +19,8 @@ import {
   X,
   AlertTriangle,
   ExternalLink,
-  Download
+  Download,
+  Binary // Icon baru ditambahkan
 } from "lucide-react";
 import Link from "next/link";
 
@@ -94,6 +95,11 @@ export default function ProjectDetail({
   const [deleteInput, setDeleteInput] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // --- NEW: SIMULATOR STATES ---
+  const [simulatorInput, setSimulatorInput] = useState<Record<string, any>>({});
+  const [predictionResult, setPredictionResult] = useState<any>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
+
   // --- FETCH DATA ---
   useEffect(() => {
     if (!projectId) return;
@@ -122,6 +128,19 @@ export default function ProjectDetail({
     fetchProject();
     fetchDatasets();
   }, [projectId, result]);
+
+  // --- NEW: RESET SIMULATOR FORM ON LOAD ---
+  useEffect(() => {
+    if (project) {
+        const initialForm: Record<string, any> = {};
+        project.schema_definition.forEach(col => {
+            if (col.name !== project.target_column) {
+                initialForm[col.name] = col.dtype === 'object' ? "" : 0;
+            }
+        });
+        setSimulatorInput(initialForm);
+    }
+  }, [project]);
 
   // --- HANDLERS ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,6 +194,19 @@ export default function ProjectDetail({
     }
   };
 
+  // --- NEW: RUN PREDICTION HANDLER ---
+  const handleRunPrediction = async () => {
+    setIsPredicting(true);
+    try {
+        const res = await api.post(`/projects/${projectId}/predict`, { data: simulatorInput });
+        setPredictionResult(res.data);
+    } catch (error) {
+        alert("Prediction failed. Make sure model is trained.");
+    } finally {
+        setIsPredicting(false);
+    }
+  };
+
   const handleDeleteProject = async () => {
     if (!project) return;
     if (deleteInput !== project.name) return;
@@ -210,12 +242,10 @@ export default function ProjectDetail({
   };
 
   const handleDownloadModel = (filename: string) => {
-    // Karena download file, kita bisa pakai window.open atau link biasa
-    // Tapi biar rapi pakai URL backend langsung
     window.open(`http://127.0.0.1:8000/models/download/${filename}`, "_blank");
   };
 
-  // Loading State yang lebih rapi (Center)
+  // Loading State
   if (loading) return (
     <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-[#09090b]">
         <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
@@ -513,6 +543,95 @@ export default function ProjectDetail({
                       <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-900 rounded-lg">
                           <div className="text-xs text-zinc-500 uppercase mb-1">Features</div>
                           <div className="text-2xl font-bold text-zinc-900 dark:text-white">{metrics.features_used.length}</div>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {/* 🚀 LIVE PREDICTION SIMULATOR */}
+          {project && (
+              <div className="mt-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center gap-3">
+                      <div className="p-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg">
+                          <Cpu size={20} />
+                      </div>
+                      <div>
+                          <h3 className="text-lg font-bold tracking-tight">Model Simulator</h3>
+                          <p className="text-xs text-zinc-500 uppercase tracking-widest">Run real-time inference on your trained model</p>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2">
+                      {/* SISI KIRI: INPUT FORM */}
+                      <div className="p-8 border-r border-zinc-100 dark:border-zinc-800">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {project.schema_definition
+                                  .filter(col => col.name !== project.target_column)
+                                  .map((col, idx) => (
+                                  <div key={idx} className="space-y-1">
+                                      <label className="text-[10px] font-bold text-zinc-500 uppercase">{col.name}</label>
+                                      <input 
+                                          type={col.dtype === 'object' ? 'text' : 'number'}
+                                          value={simulatorInput[col.name] ?? ""}
+                                          onChange={(e) => setSimulatorInput({
+                                              ...simulatorInput, 
+                                              [col.name]: col.dtype === 'object' ? e.target.value : Number(e.target.value)
+                                          })}
+                                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-sm focus:border-purple-500 outline-none transition"
+                                          placeholder={`Enter ${col.dtype}...`}
+                                      />
+                                  </div>
+                              ))}
+                          </div>
+                          <button 
+                              onClick={handleRunPrediction}
+                              disabled={isPredicting}
+                              className="mt-8 w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                              {isPredicting ? <Activity className="animate-spin" size={18} /> : <Binary size={18} />}
+                              RUN_INFERENCE
+                          </button>
+                      </div>
+
+                      {/* SISI KANAN: RESULT */}
+                      <div className="p-8 bg-zinc-50/30 dark:bg-zinc-950/20 flex flex-col items-center justify-center min-h-[300px]">
+                          {!predictionResult ? (
+                              <div className="text-center space-y-3">
+                                  <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mx-auto text-zinc-400">
+                                      <Activity size={32} />
+                                  </div>
+                                  <p className="text-sm text-zinc-500 italic">Fill the inputs and execute inference to see results.</p>
+                              </div>
+                          ) : (
+                              <div className="w-full space-y-8 animate-in zoom-in-95 duration-300">
+                                  <div className="text-center">
+                                      <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Prediction Result</div>
+                                      <div className="text-5xl font-black text-purple-600 dark:text-purple-400 uppercase tracking-tighter">
+                                          {predictionResult.prediction}
+                                      </div>
+                                      <div className="text-sm font-bold text-zinc-400 mt-2">Confidence: {predictionResult.confidence}%</div>
+                                  </div>
+
+                                  {/* Probability Bars */}
+                                  <div className="space-y-4">
+                                      <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Confidence Details</div>
+                                      {Object.entries(predictionResult.all_probabilities).map(([label, val]: [string, any]) => (
+                                          <div key={label} className="space-y-1">
+                                              <div className="flex justify-between text-xs font-mono">
+                                                  <span>{label}</span>
+                                                  <span>{val}%</span>
+                                              </div>
+                                              <div className="h-2 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                  <div 
+                                                      className={`h-full transition-all duration-1000 ${label === predictionResult.prediction ? 'bg-purple-500' : 'bg-zinc-400 dark:bg-zinc-600'}`}
+                                                      style={{ width: `${val}%` }}
+                                                  />
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
                       </div>
                   </div>
               </div>

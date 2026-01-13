@@ -2,7 +2,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse 
 from sqlalchemy.orm import Session
-from typing import List  # <--- WAJIB ADA
+from typing import List
+from pydantic import BaseModel
 
 # Import Schema & Models
 from app.db import models, database
@@ -197,32 +198,53 @@ def get_dataset_stats(dataset_id: int, db: Session = Depends(get_db)):
     dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
-
+    
+    project = crud.get_project(db, dataset.project_id)
+    
     try:
         df = pd.read_csv(dataset.file_path)
     except Exception:
-        raise HTTPException(status_code=500, detail="File not found on server")
+        raise HTTPException(status_code=500, detail="File lost")
 
-    stats = []
     total_rows = len(df)
+    target_col = project.target_column
+    
+    # --- HITUNG KORELASI (BARU) ---
+    correlations = {}
+    if target_col in df.columns:
+        # Buat copy sementara untuk hitung korelasi
+        df_corr = df.copy()
+        # Convert kolom kategori ke angka agar bisa dihitung korelasinya (Label Encoding sederhana)
+        for col in df_corr.select_dtypes(include=['object']).columns:
+            df_corr[col] = pd.factorize(df_corr[col])[0]
+        
+        # Hitung korelasi terhadap target
+        corr_matrix = df_corr.corr()
+        if target_col in corr_matrix:
+            target_corr = corr_matrix[target_col].drop(target_col).fillna(0).to_dict()
+            # Ambil nilai absolut untuk melihat kekuatan hubungan
+            correlations = {k: round(v, 3) for k, v in target_corr.items()}
 
+    # --- HITUNG STATISTIK PER KOLOM ---
+    stats = []
     for col in df.columns:
         col_type = str(df[col].dtype)
         missing_count = int(df[col].isnull().sum())
-        missing_pct = round((missing_count / total_rows) * 100, 1)
-        unique_count = int(df[col].nunique())
-
+        
         col_stat = {
             "name": col,
             "type": col_type,
             "missing": missing_count,
-            "missing_pct": missing_pct,
-            "unique": unique_count,
+            "missing_pct": round((missing_count / total_rows) * 100, 1),
+            "unique": int(df[col].nunique()),
+            "correlation": correlations.get(col, 0), # Ambil korelasi yang dihitung tadi
             "sample": df[col].dropna().head(3).tolist()
         }
 
         if pd.api.types.is_numeric_dtype(df[col]):
             col_stat["mean"] = round(float(df[col].mean()), 2)
+            col_stat["std"] = round(float(df[col].std()), 2) # Tambah Standar Deviasi
+            col_stat["median"] = float(df[col].median()) # Tambah Median
             col_stat["min"] = float(df[col].min())
             col_stat["max"] = float(df[col].max())
         else:
@@ -234,13 +256,14 @@ def get_dataset_stats(dataset_id: int, db: Session = Depends(get_db)):
         "filename": dataset.filename,
         "total_rows": total_rows,
         "total_cols": len(df.columns),
+        "target_column": target_col,
         "columns": stats
     }
 
 # --- TRAIN FROM HISTORY ---
 
 @app.post("/models/train-existing/{dataset_id}")
-def train_model_from_history(dataset_id: int, db: Session = Depends(get_db)):
+def train_model_from_history(dataset_id: int, model_type: str = "rf", db: Session = Depends(get_db)):
     dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -254,10 +277,12 @@ def train_model_from_history(dataset_id: int, db: Session = Depends(get_db)):
 
     try:
         prefix = f"model_project_{project.id}"
+        # Kirim parameter model_type
         training_result = ml_engine.train_automl(
-            df,
-            target_col=project.target_column,
-            filename_prefix=prefix
+            df, 
+            target_col=project.target_column, 
+            filename_prefix=prefix,
+            model_type=model_type
         )
         return {
             "status": "success",
@@ -277,3 +302,114 @@ def download_model(filename: str):
         raise HTTPException(status_code=404, detail="Model file not found on server")
     
     return FileResponse(file_path, media_type='application/octet-stream', filename=filename)
+
+class CleaningRequest(BaseModel):
+    action: str  # 'drop_na', 'fill_mean', 'convert_numeric'
+    columns: List[str]
+
+@app.post("/datasets/{dataset_id}/clean")
+def clean_dataset(dataset_id: int, req: CleaningRequest, db: Session = Depends(get_db)):
+    # 1. Ambil dataset asal
+    old_dataset = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
+    if not old_dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    try:
+        df = pd.read_csv(old_dataset.file_path)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Original file lost")
+
+    # 2. Eksekusi Logic Cleaning
+    if req.action == "drop_na":
+        df = df.dropna(subset=req.columns)
+    
+    elif req.action == "fill_mean":
+        for col in req.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].fillna(df[col].mean())
+    
+    elif req.action == "convert_numeric":
+        for col in req.columns:
+            # errors='coerce' akan mengubah spasi/karakter aneh menjadi NaN (angka kosong)
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # 3. Simpan sebagai file baru (Versioning)
+    clean_filename = f"cleaned_{uuid.uuid4().hex[:6]}_{old_dataset.filename}"
+    clean_path = os.path.join(UPLOAD_DIR, clean_filename)
+    df.to_csv(clean_path, index=False)
+
+    # 4. Catat ke Database sebagai dataset baru
+    new_ds = models.Dataset(
+        project_id=old_dataset.project_id,
+        filename=clean_filename,
+        file_path=clean_path,
+        row_count=len(df),
+        is_valid=1 # Setelah dibersihkan harusnya valid
+    )
+    db.add(new_ds)
+    db.commit()
+    db.refresh(new_ds)
+
+    return {
+        "status": "success", 
+        "message": f"Applied {req.action} on {len(req.columns)} columns",
+        "new_dataset_id": new_ds.id
+    }
+    
+    
+class PredictionRequest(BaseModel):
+    data: dict # Berisi input dari user sesuai schema
+
+@app.post("/projects/{project_id}/predict")
+def predict_data(project_id: int, req: PredictionRequest, db: Session = Depends(get_db)):
+    # 1. Cari model artifact
+    model_filename = f"model_project_{project_id}.joblib"
+    model_path = os.path.join("models", model_filename)
+    
+    if not os.path.exists(model_path):
+        raise HTTPException(status_code=404, detail="Model artifact not found. Please train the model first.")
+    
+    # 2. Load Artifact
+    artifact = joblib.load(model_path)
+    model = artifact["model"]
+    train_features = artifact["features"]
+    target_mapping = artifact["target_mapping"]
+
+    # 3. Preprocessing Input Data
+    # Ubah input dict ke DataFrame
+    df_input = pd.DataFrame([req.data])
+
+    # Samakan proses dummies seperti saat training
+    df_encoded = pd.get_dummies(df_input)
+
+    # --- ALIGNMENT LOGIC (SANGAT PENTING) ---
+    # Tambahkan kolom yang hilang dengan nilai 0 (karena dummies)
+    # Buang kolom yang tidak ada saat training
+    for col in train_features:
+        if col not in df_encoded.columns:
+            df_encoded[col] = 0
+            
+    # Pastikan urutan kolom SAMA PERSIS dengan saat training
+    df_encoded = df_encoded[train_features]
+
+    # 4. Predict
+    try:
+        prediction = model.predict(df_encoded)[0]
+        probabilities = model.predict_proba(df_encoded)[0] # Ambil probabilitas tiap kelas
+        
+        # Mapping hasil
+        result_label = target_mapping.get(int(prediction), str(prediction))
+        
+        # Buat list probabilitas yang cantik
+        prob_details = {}
+        for idx, prob in enumerate(probabilities):
+            label = target_mapping.get(idx, f"Class {idx}")
+            prob_details[label] = round(float(prob) * 100, 2)
+
+        return {
+            "prediction": result_label,
+            "confidence": round(float(max(probabilities)) * 100, 2),
+            "all_probabilities": prob_details
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")

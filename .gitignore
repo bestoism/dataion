@@ -18,3 +18,12 @@ dist/
 # --- IDE ---
 .vscode/
 .idea/
+
+# Machine Learning Artifacts
+backend/models/
+backend/uploads/
+*.joblib
+
+# Database
+backend/*.db
+backend/*.db-journal
