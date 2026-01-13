@@ -6,3 +6,4 @@ uploads/
 *.db-journal
 *.joblib
 *.csv
+.git
