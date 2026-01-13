@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+models/
+uploads/
+*.db
+*.db-journal
+*.joblib
+*.csv
