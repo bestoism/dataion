@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { 
   ArrowLeft, Plus, Trash2, Save, Target, 
   Upload, FileSpreadsheet, Sparkles, Database, 
-  Info, LayoutGrid, CheckCircle2 
+  Info, LayoutGrid, CheckCircle2, Activity
 } from "lucide-react";
 import Link from "next/link";
 
